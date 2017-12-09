@@ -1,38 +1,60 @@
-var problemService = require('../services/problemService')
-var problemModel = require('../models/problemModel');
-var express = require('express');
+var express = require("express");
 var router = express.Router();
+var problemService = require("../services/problemService");
+var bodyParser = require("body-parser");
+var jsonParser = bodyParser.json();
+router.use(jsonParser);
+
+var node_rest_client = require('node-rest-client').Client;
+var rest_client = new node_rest_client();
+
+EXECUTOR_SERVER_URL = 'http://localhost:5000/build_and_run'
+
+rest_client.registerMethod('build_and_run', EXECUTOR_SERVER_URL, 'POST');
 
 router.get("/problems", function (req, res) {
     problemService.getProblems()
-        .then(problems => {
-            res.header("Access-Control-Allow-Origin", "*");
-            console.log('hello'+problems);
-            return res.json(problems);
-        });
+        .then(problems => res.json(problems));
 });
 
 router.get("/problems/:id", function (req, res) {
     var id = req.params.id;
     console.log("get id:" + id);
     problemService.getProblem(+id)
-        .then(problem => {
-            res.header("Access-Control-Allow-Origin", "*");
-            res.json(problem)
-        });
+        .then(problem => res.json(problem));
 });
 
 router.post("/problems", function (req, res) {
     console.log("request@problem" + JSON.stringify(req.body));
     problemService.addProblem(req.body)
         .then(function (problem) {
-            res.header("Access-Control-Allow-Origin", "*");
             res.json(problem);
         }, function (error) {
-            res.header("Access-Control-Allow-Origin", "*");
             res.status(400).send("Problem name already exists!");
         });
 });
 
+router.post('/build_and_run', function(req, res) {
+  const userCode = req.body.user_code;
+  const lang = req.body.lang;
+  console.log(lang + ': ' + userCode);
+  
+  rest_client.methods.build_and_run(
+      {data: { code: userCode, lang: lang },
+       headers: { "Content-Type": "application/json" }
+      }, (data, response) => {
+    console.log('Recieved response from execution server: ');
+    console.log(response);
+    console.log('hi');
+    console.log(data);
+    // Generate a human readable response displayed in output textarea.
+    const text =`Build output: ${data['build']}
+    Execute output: ${data['run']}`;
 
-module.exports = router; 
+    // data['text'] = text;
+    // res.json(data);
+    res.json(text);
+  }); 
+});
+
+module.exports = router;
